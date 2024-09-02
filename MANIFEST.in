@@ -1,0 +1,2 @@
+include src/lkvm/guest/init
+include src/lkvm/guest/init.sh

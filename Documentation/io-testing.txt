@@ -1,0 +1,31 @@
+This document describes how to test each device, which is required when
+modifying the common I/O infrastructure.
+
+
+9P
+--
+
+  CONFIG_NET_9P_VIRTIO
+
+Without a --disk parameter, kvmtool shares part of the host filesystem
+with the guest using 9p. Otherwise, use the `--9p <directory>,<tag>`
+parameter to share a directory with the guest, and mount it in the guest
+with:
+
+	$ mount -t 9p <tag> <mountpoint>
+
+
+BLOCK
+-----
+
+  CONFIG_VIRTIO_BLK
+
+	$ lkvm run ... --disk <raw or qcow2 image>
+
+
+CONSOLE
+-------
+
+	$ lkvm run ... --console virtio
+
+See also virtio-console.txt
