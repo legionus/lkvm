@@ -18,7 +18,7 @@ set_env()
 
 set_ttysz()
 {
-	local stty='' esc='' cols='' rows=''
+	local stty='' esc='' cols='' rows='' prev=''
 
 	stty="$(type -P stty)" ||
 		return 0
@@ -33,8 +33,11 @@ set_ttysz()
 		# "\033[u"          -- restore saved cursor position.
 		# "R"               -- terminates the response
 		#
+		prev="$($stty -g)"
+		"$stty" raw -echo min 0 time 5
 		echo -ne "\033[s\033[9999;9999H\033[6n\033[u"
-		IFS=';[' read -s -t2 -dR esc rows cols
+		IFS=';[' read -r -s -t3 -dR esc rows cols
+		"$stty" "$prev"
 	fi
 
 	if [ -z "$cols" ] || [ -z "$rows" ]; then
