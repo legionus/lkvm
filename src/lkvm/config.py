@@ -135,7 +135,7 @@ def read(basedir: str, name: str) -> Dict[str, Any] | lkvm.Error:
                 #subsection = m.group("subname") or ""
                 continue
 
-            if m := re.match(r"^\s*(?P<name>[A-Za-z0-9_.-]+)\s*=\s*(?P<value>\S+)\s*$", line):
+            if m := re.match(r"^\s*(?P<name>[A-Za-z0-9_.-]+)\s*=\s*(?P<value>.*)\s*$", line):
                 if section not in config:
                     config[section] = {}
 

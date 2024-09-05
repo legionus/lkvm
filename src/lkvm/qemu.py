@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2024  Alexey Gladkov <legion@kernel.org>
 
-import os
 import glob
+import os
+import re
 
 from typing import Dict, List, Any
 
@@ -233,9 +234,12 @@ def arg_kernel(key: str, config: Dict[str, Any]) -> List[str]:
 def arg_cmdline(key: str, config: Dict[str, Any]) -> List[str]:
     value = config[key]
 
-    if not value:
-        return ["-append", lkvm.kernel.CMDLINE.join()]
-    return []
+    if value:
+        for param in value.split(" "):
+            if m := re.match(r"^\s*(?P<name>[^=]+)\s*=\s*(?P<value>.*)\s*$", param):
+                lkvm.kernel.CMDLINE[m.group("name")] = m.group("value")
+
+    return ["-append", lkvm.kernel.CMDLINE.join()]
 
 def dump(a: List[str]) -> None:
     is_option = False
