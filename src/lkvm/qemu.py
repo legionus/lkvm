@@ -236,8 +236,29 @@ def arg_cmdline(key: str, config: Dict[str, Any]) -> List[str]:
 
     if value:
         for param in value.split(" "):
-            if m := re.match(r"^\s*(?P<name>[^=]+)\s*=\s*(?P<value>.*)\s*$", param):
-                lkvm.kernel.CMDLINE[m.group("name")] = m.group("value")
+            if m := re.match(r"^(?P<name>[^=]+)=(?P<value>.*)", param):
+                if m.group("value"):
+                    lkvm.kernel.CMDLINE[m.group("name")] = m.group("value")
+                else:
+                    lkvm.kernel.CMDLINE[m.group("name")] = None
+
+    required_params: Dict[str, Any] = {
+        "init"        : "/init",
+        "rootflags"   : "trans=virtio,version=9p2000.L",
+        "rootfstype"  : "9p",
+        "earlyprintk" : "serial",
+    }
+    optional_params: Dict[str, Any] = {
+        "rw"          : True,
+        "ip"          : "dhcp",
+    }
+
+    for k, v in required_params.items():
+        lkvm.kernel.CMDLINE[k] = v
+
+    for k, v in optional_params.items():
+        if k not in lkvm.kernel.CMDLINE:
+            lkvm.kernel.CMDLINE[k] = v
 
     return ["-append", lkvm.kernel.CMDLINE.join()]
 

@@ -11,11 +11,16 @@ class KernelCmdline:
         for k, v in init.items():
             self[k] = v
 
+    def __contains__(self, key: str) -> bool:
+        if key in ["rw", "ro"]:
+            return self._mode == key
+        return key in self._dict
+
     def __getitem__(self, key: str) -> Any:
         return self._dict[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
-        if key in ("rw", "ro"):
+        if key in ["rw", "ro"]:
             self._mode = key
             return
         self._dict[key] = value
@@ -32,11 +37,4 @@ class KernelCmdline:
         return " ".join(ret)
 
 
-CMDLINE = KernelCmdline({
-    "rw"          : True,
-    "ip"          : "dhcp",
-    "init"        : "/init",
-    "rootflags"   : "trans=virtio,version=9p2000.L",
-    "rootfstype"  : "9p",
-    "earlyprintk" : "serial",
-})
+CMDLINE = KernelCmdline({})
