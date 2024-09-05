@@ -110,7 +110,7 @@ def arg_random(key: str, config: Dict[str, Any]) -> List[str]:
         return [
 			"-chardev", f"socket,id=chr0,${data}",
             "-object", "rng-egd,chardev=chr0,id=rng0",
-			"=device", "virtio-rng-pci,rng=rng0",
+			"-device", "virtio-rng-pci,rng=rng0",
         ]
 
     logger.critical("BUG: Unknown random type: %s", value)
