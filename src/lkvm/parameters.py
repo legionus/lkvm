@@ -99,6 +99,7 @@ def set_monitor() -> str:
 
 
 PARAMS = [
+    Parameter('mode'    , None         , 'mode'       , 'store'      , '9p'            , None                    , 'Profile mode')                                                                          ,
     Parameter('arch'    , 'arch'       , 'arch'       , 'store'      , detect_arch     , None                    , 'Specifies target architecture')                                                         ,
     Parameter('machine' , 'machine'    , 'machine'    , 'store'      , 'accel=kvm:tcg' , lkvm.qemu.arg_simple    , 'Specifies the emulated machine')                                                        ,
     Parameter('cpu'     , 'cpu'        , 'cpu'        , 'store'      , detect_cpu      , lkvm.qemu.arg_simple    , 'Specifies CPU model')                                                                   ,

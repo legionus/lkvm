@@ -25,6 +25,14 @@ class KernelCmdline:
             return
         self._dict[key] = value
 
+    def __len__(self) -> int:
+        n = 0
+        for k in self._dict.keys():
+            if self._dict[k] is None:
+                continue
+            n += 1
+        return n
+
     def join(self) -> str:
         ret = [ self._mode ]
         for k in sorted(self._dict.keys()):

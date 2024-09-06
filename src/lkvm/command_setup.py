@@ -35,20 +35,7 @@ def write_file(filename: str, data: List[str]) -> None:
             print(line, file=fd)
 
 
-def main(cmdargs: argparse.Namespace) -> int:
-    profile = cmdargs.profile
-
-    config = lkvm.config.read("~/vm", profile)
-
-    if isinstance(config, lkvm.Error):
-        logger.critical("%s", config.message)
-        return lkvm.EX_FAILURE
-
-    for p in lkvm.parameters.PARAMS:
-        p.add_config(cmdargs, config["vm"])
-
-    rootfs = config["global"]["rootfs"]
-
+def setup_rootfs(rootfs: str, confdata: List[str]) -> None:
     for path in ["dev", "etc", "host", "proc", "sys", "tmp", "var/lib", "virt/home"]:
         os.makedirs(os.path.join(rootfs, path), mode=0o755, exist_ok=True)
 
@@ -63,6 +50,26 @@ def main(cmdargs: argparse.Namespace) -> int:
     write_file(os.path.join(rootfs, "etc/passwd"), ["root:x:0:0:root:/virt/home:/bin/bash"])
     write_file(os.path.join(rootfs, "etc/group"),  ["root:x:0:"])
 
+    confdata.extend([
+        "\tvirtfs = ${rootfs}:/dev/root",
+        "\tvirtfs = /:hostfs",
+    ])
+
+
+def main(cmdargs: argparse.Namespace) -> int:
+    profile = cmdargs.profile
+
+    config = lkvm.config.read("~/vm", profile)
+
+    if isinstance(config, lkvm.Error):
+        logger.critical("%s", config.message)
+        return lkvm.EX_FAILURE
+
+    for p in lkvm.parameters.PARAMS:
+        p.add_config(cmdargs, config["vm"])
+
+    config["vm"]["mode"] = cmdargs.mode
+
     data = [
         "[vm]",
     ]
@@ -75,11 +82,19 @@ def main(cmdargs: argparse.Namespace) -> int:
             if v:
                 data.append(f"\t{k} = {v}")
 
-    data.extend([
-        "\tvirtfs = ${rootfs}:/dev/root",
-        "\tvirtfs = /:hostfs",
-    ])
+    if cmdargs.mode == "9p":
+        setup_rootfs(config["global"]["rootfs"], data)
+        data.append(f"\t# kernel = /path/to/linux/bzImage")
 
+    if cmdargs.mode == "disk":
+        data.append(f"\t# disk = /path/to/disk.qcow2")
+
+    os.makedirs(config["global"]["profile"], mode=0o755, exist_ok=True)
     write_file(config["global"]["config"], data)
+
+    if cmdargs.mode == "9p":
+        logger.warning("for 9p mode it is necessary to specify a kernel to run.")
+    else:
+        logger.warning("for disk mode it is necessary to specify a disks to run.")
 
     return lkvm.EX_SUCCESS

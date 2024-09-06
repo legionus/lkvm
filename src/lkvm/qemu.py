@@ -242,25 +242,29 @@ def arg_cmdline(key: str, config: Dict[str, Any]) -> List[str]:
                 else:
                     lkvm.kernel.CMDLINE[m.group("name")] = None
 
-    required_params: Dict[str, Any] = {
-        "init"        : "/init",
-        "rootflags"   : "trans=virtio,version=9p2000.L",
-        "rootfstype"  : "9p",
-        "earlyprintk" : "serial",
-    }
-    optional_params: Dict[str, Any] = {
-        "rw"          : True,
-        "ip"          : "dhcp",
-    }
+    if config["mode"] == "9p":
+        required_params: Dict[str, Any] = {
+            "init"        : "/init",
+            "rootflags"   : "trans=virtio,version=9p2000.L",
+            "rootfstype"  : "9p",
+            "earlyprintk" : "serial",
+        }
+        optional_params: Dict[str, Any] = {
+            "rw"          : True,
+            "ip"          : "dhcp",
+        }
 
-    for k, v in required_params.items():
-        lkvm.kernel.CMDLINE[k] = v
-
-    for k, v in optional_params.items():
-        if k not in lkvm.kernel.CMDLINE:
+        for k, v in required_params.items():
             lkvm.kernel.CMDLINE[k] = v
 
-    return ["-append", lkvm.kernel.CMDLINE.join()]
+        for k, v in optional_params.items():
+            if k not in lkvm.kernel.CMDLINE:
+                lkvm.kernel.CMDLINE[k] = v
+
+    if len(lkvm.kernel.CMDLINE) > 0:
+        return ["-append", lkvm.kernel.CMDLINE.join()]
+
+    return []
 
 def dump(a: List[str]) -> None:
     is_option = False

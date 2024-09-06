@@ -76,6 +76,9 @@ of your home directory.
                                 epilog=epilog, add_help=False)
     sp0.set_defaults(func=cmd_setup)
     add_common_arguments(sp0)
+    sp0.add_argument("-m", "--mode",
+                     dest="mode", action="store", default="9p", choices=["9p", "disk"],
+                     help="profile mode (default: %(default)s).")
     sp0.add_argument("profile", help="name of profile")
 
     # command: list
