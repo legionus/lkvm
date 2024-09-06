@@ -144,19 +144,4 @@ def cmd() -> int:
 
 
 if __name__ == '__main__':
-    # We're running from a checkout, so reflect git commit in the version
-    import os
-    # noinspection PyBroadException
-    try:
-        if lkvm.__VERSION__.find('-dev') > 0:
-            base = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-            dotgit = os.path.join(base, '.git')
-            ecode, short = lkvm.git_run_command(dotgit, ['rev-parse', '--short', 'HEAD'])
-            if ecode == 0:
-                ver = lkvm.__VERSION__
-                sha = short.strip()
-                lkvm.__VERSION__ = f"{ver}-{sha:.5s}"
-    except Exception as ex:
-        # Any failures above are non-fatal
-        pass
     sys.exit(cmd())

@@ -10,7 +10,7 @@ import subprocess
 from typing import Optional, Dict, Tuple, List, Union, Any
 from collections.abc import Iterator
 
-__VERSION__ = '1'
+__VERSION__ = '1-dev'
 
 EX_SUCCESS = 0 # Successful exit status.
 EX_FAILURE = 1 # Failing exit status.
@@ -57,27 +57,6 @@ def run_command(cmdargs: List[str], stdin: Optional[bytes] = None,
         os.chdir(curdir)
 
     return returncode, output, error
-
-
-def git_run_command(gitdir: Optional[str], args: List[str],
-                    stdin: Optional[bytes] = None) -> Tuple[int, str]:
-    cmdargs = ["git", "--no-pager"]
-    if gitdir:
-        if os.path.exists(os.path.join(gitdir, ".git")):
-            gitdir = os.path.join(gitdir, ".git")
-        cmdargs += ["--git-dir", gitdir]
-    cmdargs += args
-
-    ecode, out, err = run_command(cmdargs, stdin=stdin)
-
-    output = out.decode(errors="replace")
-
-    if len(err.strip()):
-        error = err.decode(errors="replace")
-        logger.critical("Stderr: %s", error)
-        output += error
-
-    return ecode, output
 
 
 def setup_logger(logger: logging.Logger, level: int, fmt: str) -> logging.Logger:
