@@ -241,6 +241,8 @@ def arg_cmdline(key: str, config: Dict[str, Any]) -> List[str]:
                     lkvm.kernel.CMDLINE[m.group("name")] = m.group("value")
                 else:
                     lkvm.kernel.CMDLINE[m.group("name")] = None
+            else:
+                lkvm.kernel.CMDLINE[param] = True
 
     if config["mode"] == "9p":
         required_params: Dict[str, Any] = {
