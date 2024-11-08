@@ -4,13 +4,14 @@
 import os
 import argparse
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import lkvm.qemu
 
 
 class Parameter:
-    def __init__(self, name: str, cmdline: str, confname: str, action: str,
+    def __init__(self, name: str, cmdline: Optional[str],
+                 confname: str, action: str,
                  default: Any, qemu_arg: Any, desc: str):
         self.name     = name
         self.cmdline  = cmdline
