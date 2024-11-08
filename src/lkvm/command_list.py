@@ -26,6 +26,10 @@ def main(cmdargs: argparse.Namespace) -> int:
 
             config = lkvm.config.read("~/vm", ent.name)
 
+            if isinstance(config, lkvm.Error):
+                logger.critical("%s", config.message)
+                continue
+
             if ( sz := len(ent.name)) > header[0]:
                 header[0] = sz
             if ( sz := len(config["vm"].get("mode", "9p"))) > header[1]:
