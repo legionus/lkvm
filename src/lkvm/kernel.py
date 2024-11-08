@@ -27,8 +27,8 @@ class KernelCmdline:
 
     def __len__(self) -> int:
         n = 0
-        for k in self._dict.keys():
-            if self._dict[k] is None:
+        for _, v in self._dict.items():
+            if v is None:
                 continue
             n += 1
         return n
