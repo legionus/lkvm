@@ -84,10 +84,10 @@ def main(cmdargs: argparse.Namespace) -> int:
 
     if cmdargs.mode == "9p":
         setup_rootfs(config["global"]["rootfs"], data)
-        data.append(f"\t# kernel = /path/to/linux/bzImage")
+        data.append("\t# kernel = /path/to/linux/bzImage")
 
     if cmdargs.mode == "disk":
-        data.append(f"\t# disk = /path/to/disk.qcow2")
+        data.append("\t# disk = /path/to/disk.qcow2")
 
     os.makedirs(config["global"]["profile"], mode=0o755, exist_ok=True)
     write_file(config["global"]["config"], data)
