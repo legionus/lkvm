@@ -159,7 +159,8 @@ class OverlayFS(BaseFS): # type: ignore
         self.track_entry(self.root_dir)
 
     def create_fsentry(self, path: bytes,
-                       parent: Optional[FSEntry] = None) -> FSEntry:
+                       parent: Optional[FSEntry] = None,
+                       fstat: Optional[os.stat_result] = None) -> FSEntry:
         types = {
             stat.S_IFDIR : FileType.DIR,
             stat.S_IFCHR : FileType.CHR,
@@ -183,7 +184,10 @@ class OverlayFS(BaseFS): # type: ignore
         if parent:
             parent_id = parent.fileid
 
-        entry = fill_fsentry(FSEntry(), os.lstat(fs_path))
+        if fstat is None:
+            fstat = os.lstat(fs_path)
+
+        entry = fill_fsentry(FSEntry(), fstat)
 
         kwargs: Dict[str, Any] = {
                 "fs_source" : fs_path,
@@ -246,21 +250,25 @@ class OverlayFS(BaseFS): # type: ignore
         }
 
         try:
-            for name in os.listdir(directory.fs_source):
-                path = os.path.join(directory.fs_source, name)
-                new = self.create_fsentry(path)
+            fd = -1
+            fd = os.open(directory.fs_source, os.O_DIRECTORY|os.O_NOFOLLOW|os.O_NOCTTY)
 
-                if cur := self.get_entry_by_id(new.fileid):
-                    childs[cur.name] = cur
+            for name in os.listdir(fd):
+                fname = name.encode("utf-8")
+                st = os.lstat(fname, dir_fd=fd)
+
+                if cur := self.get_entry_by_id(self.inodes.get(st.st_dev, st.st_ino)):
+                    childs[fname] = cur
                     continue
 
-                self.track_entry(new)
-
-                new.parent_id = directory.fileid
-                childs[new.name] = new
+                childs[fname] = self.create_fsentry(os.path.join(directory.fs_source, fname),
+                                                    directory, fstat=st)
+                self.track_entry(childs[fname])
 
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
+        finally:
+            close_no_exc(fd)
 
         directory.nlink = len(childs)
 
