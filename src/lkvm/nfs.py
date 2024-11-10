@@ -20,7 +20,6 @@ from shenaniganfs.fs          import FileType, BaseFSEntry, BaseFS, NFSError, FS
 from shenaniganfs.fs_manager  import EvictingFileSystemManager, FileSystemManager, create_fs                 # type: ignore[import-untyped]
 from shenaniganfs.nfs2        import MountV1Service, NFSV2Service                                            # type: ignore[import-untyped]
 from shenaniganfs.nfs3        import MountV3Service, NFSV3Service                                            # type: ignore[import-untyped]
-from shenaniganfs.portmanager import PortManager, SimplePortMapper, SimpleRPCBind                            # type: ignore[import-untyped]
 from shenaniganfs.server      import TCPTransportServer                                                      # type: ignore[import-untyped]
 from shenaniganfs.statd       import StatDV1Server                                                           # type: ignore[import-untyped]
 
@@ -410,7 +409,7 @@ class OverlayFS(BaseFS): # type: ignore
         self.remove_entry(entry)
 
     def read(self, entry: FSEntry, offset: int, count: int) -> bytes:
-        logger.debug("CALL: read: entry=%s", entry.fs_source)
+        logger.debug("CALL: read: entry=%s offset=%s count=%s", entry.fs_source, offset, count)
 
         self._verify_owned(entry)
 
@@ -573,8 +572,7 @@ class OverlayFileHandleEncoder(abc.ABC):
 
 
 async def serve_nfs(fs_manager: FileSystemManager,
-                    srvaddr: Tuple[str,int] = ("localhost", 2049),
-                    pmapaddr: Optional[Tuple[str,int]] = ("localhost", 111)) -> None:
+                    srvaddr: Tuple[str,int] = ("localhost", 2049)) -> None:
 
     transport_server = TCPTransportServer(srvaddr[0], srvaddr[1])
     transport_server.register_prog(MountV1Service(fs_manager))
@@ -582,17 +580,7 @@ async def serve_nfs(fs_manager: FileSystemManager,
     transport_server.register_prog(MountV3Service(fs_manager))
     transport_server.register_prog(NFSV3Service(fs_manager))
     transport_server.register_prog(StatDV1Server())
-
-    if pmapaddr is not None:
-        port_manager = PortManager()
-        rpcbind_transport_server = TCPTransportServer(pmapaddr[0], pmapaddr[1])
-        rpcbind_transport_server.register_prog(SimplePortMapper(port_manager))
-        rpcbind_transport_server.register_prog(SimpleRPCBind(port_manager))
-        rpcbind_transport_server.notify_port_manager(port_manager)
-        await rpcbind_transport_server.start()
-        transport_server.notify_port_manager(port_manager)
-    else:
-        await transport_server.notify_rpcbind()
+    await transport_server.notify_rpcbind()
 
     server = await transport_server.start()
 
@@ -611,9 +599,8 @@ async def main(rootfs: bytes,
                                         mountpoints=mountpoints),
         },
     )
-    await serve_nfs(fs_manager,
-                    srvaddr=("localhost", nfsport),
-                    pmapaddr=None)
+    await serve_nfs(fs_manager, srvaddr=("localhost", nfsport))
+
 
 def thread(rootfs: bytes,
            mountpoints: Dict[bytes, bytes],
