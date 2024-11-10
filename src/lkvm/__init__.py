@@ -10,6 +10,14 @@ import subprocess
 from typing import Optional, Dict, Tuple, List, Union, Any
 from collections.abc import Iterator
 
+HAVE_NFS = False
+
+try:
+    import shenaniganfs # type: ignore[import-untyped]
+    HAVE_NFS = True
+except ImportError:
+    pass
+
 __VERSION__ = '1-dev'
 
 EX_SUCCESS = 0 # Successful exit status.

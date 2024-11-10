@@ -76,8 +76,14 @@ of your home directory.
                                 epilog=epilog, add_help=False)
     sp0.set_defaults(func=cmd_setup)
     add_common_arguments(sp0)
+
+    mode_choices = ["9p", "disk"]
+
+    if lkvm.HAVE_NFS:
+        mode_choices.append("nfs")
+
     sp0.add_argument("-m", "--mode",
-                     dest="mode", action="store", default="9p", choices=["9p", "disk"],
+                     dest="mode", action="store", default="9p", choices=mode_choices,
                      help="profile mode (default: %(default)s).")
     sp0.add_argument("profile", help="name of profile")
 

@@ -1,0 +1,3 @@
+[submodule "src/ShenanigaNFS"]
+	path = src/ShenanigaNFS
+	url = https://github.com/legionus/ShenanigaNFS

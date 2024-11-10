@@ -5,6 +5,6 @@
 REAL_SCRIPT=$(realpath -e ${BASH_SOURCE[0]})
 SCRIPT_TOP="${SCRIPT_TOP:-$(dirname ${REAL_SCRIPT})}"
 
-export PYTHONPATH="${SCRIPT_TOP}/src"
+export PYTHONPATH="${SCRIPT_TOP}/src:${SCRIPT_TOP}/src/ShenanigaNFS"
 
 exec python3 "${SCRIPT_TOP}/src/lkvm/command.py" "${@}"

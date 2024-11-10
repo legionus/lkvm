@@ -2,6 +2,7 @@
 # Copyright (C) 2024  Alexey Gladkov <legion@kernel.org>
 
 import argparse
+import threading
 
 from typing import Dict, List, Any
 
@@ -9,6 +10,9 @@ import lkvm
 import lkvm.config
 import lkvm.parameters
 import lkvm.qemu
+
+if lkvm.HAVE_NFS:
+    import lkvm.nfs
 
 logger = lkvm.logger
 
@@ -60,6 +64,17 @@ def main(cmdargs: argparse.Namespace) -> int:
         print("Command to execute:\n")
         lkvm.qemu.dump([qemu_exe] + qemu_args)
         return lkvm.EX_SUCCESS
+
+    if lkvm.HAVE_NFS:
+        t = threading.Thread(
+                target=lkvm.nfs.thread,
+                kwargs={
+                    "rootfs"      : config["global"]["rootfs"].encode("utf-8"),
+                    "mountpoints" : { b"/host": b"/" },
+                    "nfsport"     : int(config["vm"]["nfsport"]),
+                })
+        t.daemon = True
+        t.start()
 
     lkvm.exec_command([qemu_exe] + qemu_args)
 

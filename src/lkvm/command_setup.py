@@ -82,6 +82,15 @@ def main(cmdargs: argparse.Namespace) -> int:
             if v:
                 data.append(f"\t{k} = {v}")
 
+    if cmdargs.mode == "nfs":
+        if not lkvm.HAVE_NFS:
+            logger.critical("nfs mode is not available because the required python modules are missing.")
+            return lkvm.EX_FAILURE
+        setup_rootfs(config["global"]["rootfs"], data)
+        data.append("\tdevice = e1000,netdev=nfs0")
+        data.append("\tnetwork = netdev,user,id=nfs0")
+        data.append("\t# kernel = /path/to/linux/bzImage")
+
     if cmdargs.mode == "9p":
         setup_rootfs(config["global"]["rootfs"], data)
         data.append("\t# kernel = /path/to/linux/bzImage")
@@ -92,9 +101,9 @@ def main(cmdargs: argparse.Namespace) -> int:
     os.makedirs(config["global"]["profile"], mode=0o755, exist_ok=True)
     write_file(config["global"]["config"], data)
 
-    if cmdargs.mode == "9p":
-        logger.warning("for 9p mode it is necessary to specify a kernel to run.")
+    if cmdargs.mode in ["9p", "nfs"]:
+        logger.warning(f"for {cmdargs.mode} mode it is necessary to specify a kernel to run.")
     else:
-        logger.warning("for disk mode it is necessary to specify a disks to run.")
+        logger.warning(f"for {cmdargs.mode} mode it is necessary to specify a disks to run.")
 
     return lkvm.EX_SUCCESS

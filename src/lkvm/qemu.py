@@ -231,6 +231,7 @@ def arg_kernel(key: str, config: Dict[str, Any]) -> List[str]:
 
     return ["-kernel", str(value)]
 
+
 def arg_cmdline(key: str, config: Dict[str, Any]) -> List[str]:
     value = config[key]
 
@@ -244,24 +245,39 @@ def arg_cmdline(key: str, config: Dict[str, Any]) -> List[str]:
             else:
                 lkvm.kernel.CMDLINE[param] = True
 
-    if config["mode"] == "9p":
-        required_params: Dict[str, Any] = {
-            "init"        : "/init",
-            "rootflags"   : "trans=virtio,version=9p2000.L",
-            "rootfstype"  : "9p",
-            "earlyprintk" : "serial",
-        }
-        optional_params: Dict[str, Any] = {
-            "rw"          : True,
-            "ip"          : "dhcp",
-        }
+    required_params: Dict[str, Any] = {}
+    optional_params: Dict[str, Any] = {}
 
-        for k, v in required_params.items():
+    if config["mode"] == "nfs":
+        required_params["init"]        = "/virt/init"
+        required_params["root"]        = "/dev/nfs"
+        required_params["nfsroot"]     = "/,port=${nfsport}"
+        required_params["earlyprintk"] = "serial"
+        required_params["ip"]          = "dhcp"
+        optional_params["rw"]          = True
+
+
+    if config["mode"] == "9p":
+        required_params["init"]        = "/init"
+        required_params["rootflags"]   = "trans=virtio,version=9p2000.L"
+        required_params["rootfstype"]  = "9p"
+        required_params["earlyprintk"] = "serial"
+        optional_params["rw"]          = True
+        optional_params["ip"]          = "dhcp"
+
+    for k, v in required_params.items():
+        lkvm.kernel.CMDLINE[k] = v
+
+    for k, v in optional_params.items():
+        if k not in lkvm.kernel.CMDLINE:
             lkvm.kernel.CMDLINE[k] = v
 
-        for k, v in optional_params.items():
-            if k not in lkvm.kernel.CMDLINE:
-                lkvm.kernel.CMDLINE[k] = v
+    # pylint: disable-next=consider-using-dict-items
+    for k in lkvm.kernel.CMDLINE.keys():
+        v = lkvm.kernel.CMDLINE[k]
+
+        if isinstance(v, str):
+            lkvm.kernel.CMDLINE[k] = lkvm.config.expandvars_string(config, v)
 
     if len(lkvm.kernel.CMDLINE) > 0:
         return ["-append", lkvm.kernel.CMDLINE.join()]

@@ -10,9 +10,14 @@ import lkvm.qemu
 
 
 class Parameter:
-    def __init__(self, name: str, cmdline: Optional[str],
-                 confname: str, action: str,
-                 default: Any, qemu_arg: Any, desc: str):
+    def __init__(self,
+                 name: str,
+                 cmdline: Optional[str],
+                 confname: str,
+                 action: str,
+                 default: Any,
+                 qemu_arg: Any,
+                 desc: str):
         self.name     = name
         self.cmdline  = cmdline
         self.confname = confname
@@ -117,6 +122,7 @@ PARAMS = [
     Parameter('virtfs'  , 'virtfs'     , 'virtfs'     , 'append'     , []              , lkvm.qemu.arg_virtfs    , 'Specifies the export path for the file system device')                                  ,
     Parameter('object'  , 'object'     , 'object'     , 'append'     , []              , lkvm.qemu.arg_simple    , 'Adds a new object of type typename setting properties in the order they are specified') ,
     Parameter('device'  , 'device'     , 'device'     , 'append'     , []              , lkvm.qemu.arg_simple    , 'Adds device driver and sets driver properties')                                         ,
+    Parameter('nfsport' , 'nfsport'    , 'nfsport'    , 'store'      , '2049'          , None                    , 'Specifies port on which the NFS server will listen in case of nfs mode.')               ,
     Parameter('boot'    , 'boot'       , 'boot'       , 'store'      , ''              , lkvm.qemu.arg_boot      , 'Specifies boot order drives as a string of drive letters')                              ,
     Parameter('kernel'  , 'kernel'     , 'kernel'     , 'store'      , ''              , lkvm.qemu.arg_kernel    , 'Specifies bzImage as kernel image')                                                     ,
     Parameter('initrd'  , 'initrd'     , 'initrd'     , 'store'      , ''              , lkvm.qemu.arg_simple    , 'Specifies file as initial ram disk')                                                    ,

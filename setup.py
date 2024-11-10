@@ -46,7 +46,7 @@ setup(
         python_requires=">=3.11",
         entry_points={"console_scripts": ["lkvm=lkvm.command:cmd"]},
         packages=["lkvm", "lkvm/guest"],
-        package_dir={"": "src"},
+        package_dir={"": "src", "shenaniganfs": "src/ShenanigaNFS/shenaniganfs" },
         cmdclass={"build_py": BuildGuestInitCommand},
         include_package_data=True,
 )
