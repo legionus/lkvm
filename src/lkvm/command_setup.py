@@ -102,8 +102,8 @@ def main(cmdargs: argparse.Namespace) -> int:
     write_file(config["global"]["config"], data)
 
     if cmdargs.mode in ["9p", "nfs"]:
-        logger.warning(f"for {cmdargs.mode} mode it is necessary to specify a kernel to run.")
+        logger.warning("for %s mode it is necessary to specify a kernel to run.", cmdargs.mode)
     else:
-        logger.warning(f"for {cmdargs.mode} mode it is necessary to specify a disks to run.")
+        logger.warning("for %s mode it is necessary to specify a disks to run.", cmdargs.mode)
 
     return lkvm.EX_SUCCESS
