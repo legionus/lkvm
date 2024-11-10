@@ -14,7 +14,7 @@ import struct
 import time
 import weakref
 
-from typing import Generator, Optional, Sequence, Dict, Tuple, Union, Any
+from typing import Optional, Sequence, Dict, Tuple, Union, Any
 
 from shenaniganfs.fs          import FileType, BaseFSEntry, BaseFS, NFSError, FSException, DecodedFileHandle # type: ignore[import-untyped]
 from shenaniganfs.fs_manager  import EvictingFileSystemManager, FileSystemManager, create_fs                 # type: ignore[import-untyped]
@@ -52,7 +52,6 @@ ERRNO_MAPPING = {
 class FSEntry(BaseFSEntry): # type: ignore
     fs_source: bytes
     fs_stat: os.stat_result
-    fs_childs: Dict[bytes, Any]
 
 
 class FSEntryLink:
@@ -185,7 +184,6 @@ class OverlayFS(BaseFS): # type: ignore
         kwargs: Dict[str, Any] = {
                 "fs_source" : fs_path,
                 "fs_links"  : 0,
-                "fs_childs" : {},
                 "fs"        : weakref.ref(self),
                 "type"      : types.get(stat.S_IFMT(entry.fs_stat.st_mode),
                                         FileType.REG),
@@ -221,102 +219,66 @@ class OverlayFS(BaseFS): # type: ignore
         self.inodes.put(entry.fs_stat.st_dev, entry.fs_stat.st_ino)
         del self.entries[entry.fileid]
 
-    def iter_descendants(self, entry: FSEntry,
-                         inclusive: bool = False,
-                         _depth: int = 0) -> Generator[FSEntry, None, None]:
-        if _depth > 1000:
-            raise ValueError("Possible recursion in directory tree")
-
-        if entry.type == FileType.DIR:
-            for child in entry.fs_childs.values():
-                yield from self.iter_descendants(child, inclusive=False, _depth=_depth + 1)
-                yield child
-
-        if inclusive:
-            yield entry
-
-    def get_child_by_name(self, directory: FSEntry, name: bytes) -> Optional[FSEntry]:
-        self._verify_owned(directory)
-
-        if directory.type != FileType.DIR:
-            raise FSException(NFSError.ERR_NOTDIR)
-
-        if len(directory.fs_childs) == 0:
-            self.fill_fs_childs(directory)
-
-        return directory.fs_childs.get(name)
+    def get_child_by_name(self, directory: FSEntry, name: bytes) -> Optional[Union[FSEntry, FSEntryLink]]:
+        return self.lookup(directory, name)
 
     def get_entry_by_id(self, fileid: int) -> Optional[FSEntry]:
         return self.entries.get(fileid)
 
-    def fill_fs_childs(self, directory: FSEntry) -> None:
+    def get_dir_childs(self, directory: FSEntry) -> Dict[bytes, Union[FSEntry, FSEntryLink]]:
+        self._verify_owned(directory)
+
         if directory.type != FileType.DIR:
-            return
+            raise FSException(NFSError.ERR_NOTDIR)
 
         parent = directory.fs().root_dir
 
         if directory.parent_id:
             parent = self.get_entry_by_id(directory.parent_id)
 
-        fs_childs: Dict[bytes, Union[FSEntry, FSEntryLink]] = {
+        childs: Dict[bytes, Union[FSEntry, FSEntryLink]] = {
                 b"." : FSEntryLink(directory, {"name": b"." }),
                 b"..": FSEntryLink(parent,    {"name": b".."}),
         }
 
         try:
             for name in os.listdir(directory.fs_source):
-                cur = directory.fs_childs.get(name)
+                path = os.path.join(directory.fs_source, name)
+                new = self.create_fsentry(path)
 
-                if cur is None:
-                    path = os.path.join(directory.fs_source, name)
-                    cur = self.create_fsentry(path, directory)
-                    self.track_entry(cur)
+                if cur := self.get_entry_by_id(new.fileid):
+                    childs[cur.name] = cur
+                    continue
 
-                fs_childs[cur.name] = cur
+                self.track_entry(new)
+
+                new.parent_id = directory.fileid
+                childs[new.name] = new
 
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
 
-        for child in directory.fs_childs.keys():
-            if child not in fs_childs:
-                self.remove_entry(directory.fs_childs[child])
+        directory.nlink = len(childs)
 
-        directory.fs_childs = fs_childs
-        directory.nlink = len(directory.fs_childs)
+        return childs
 
-    def lookup(self, directory: FSEntry, name: bytes) -> Optional[FSEntry]:
+    def lookup(self, directory: FSEntry, name: bytes) -> Optional[Union[FSEntry, FSEntryLink]]:
         logger.debug("CALL: lookup: dir=%s name=%s", directory.fs_source, name)
 
-        self._verify_owned(directory)
+        childs = self.get_dir_childs(directory)
+        return childs.get(name)
 
-        if directory.type != FileType.DIR:
-            raise FSException(NFSError.ERR_NOTDIR)
-
-        if len(directory.fs_childs) == 0:
-            self.fill_fs_childs(directory)
-
-        return self.get_child_by_name(directory, name)
-
-    def readdir(self, directory: FSEntry) -> Sequence[FSEntry]:
+    def readdir(self, directory: FSEntry) -> Sequence[Union[FSEntry, FSEntryLink]]:
         logger.debug("CALL: readdir: dir=%s", directory.fs_source)
 
-        self._verify_owned(directory)
-
-        if directory.type != FileType.DIR:
-            raise FSException(NFSError.ERR_NOTDIR)
-
-        self.fill_fs_childs(directory)
-
-        return list(directory.fs_childs.values())
+        childs = self.get_dir_childs(directory)
+        return list(childs.values())
 
     def mkdir(self, dest: FSEntry, name: bytes, attrs: Dict[str, Any]) -> FSEntry:
         logger.debug("CALL: mkdir: dir=%s name=%s", dest.fs_source, name)
 
         self._verify_owned(dest)
         self._verify_writable()
-
-        if self.get_child_by_name(dest, name):
-            raise FSException(NFSError.ERR_EXIST)
 
         path = os.path.join(dest.fs_source, name)
 
@@ -334,7 +296,7 @@ class OverlayFS(BaseFS): # type: ignore
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
         except Exception as exc:
-            logger.critical("Unexpected exception: %s", repr(exc))
+            logger.critical("Unexpected exception in mkdir(): %s", repr(exc))
             raise FSException(NFSError.ERR_IO) from exc
         finally:
             close_no_exc(fd1)
@@ -342,8 +304,6 @@ class OverlayFS(BaseFS): # type: ignore
 
         entry = self.create_fsentry(path, dest)
         self.track_entry(entry)
-
-        dest.fs_childs[entry.name] = entry
 
         return entry
 
@@ -365,14 +325,8 @@ class OverlayFS(BaseFS): # type: ignore
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
         except Exception as exc:
-            logger.critical("Unexpected exception: %s", repr(exc))
+            logger.critical("Unexpected exception in rmdir(): %s", repr(exc))
             raise FSException(NFSError.ERR_IO) from exc
-
-        if entry.parent_id:
-            parent = self.get_entry_by_id(entry.parent_id)
-
-            if parent is not None and len(parent.fs_childs) > 0:
-                del parent.fs_childs[entry.name]
 
         self.remove_entry(entry)
 
@@ -397,21 +351,13 @@ class OverlayFS(BaseFS): # type: ignore
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
         except Exception as exc:
-            logger.critical("Unexpected exception: %s", repr(exc))
+            logger.critical("Unexpected exception in rename(): %s", repr(exc))
             raise FSException(NFSError.ERR_IO) from exc
         finally:
             close_no_exc(fd1)
 
         entry = self.create_fsentry(path, to_dir)
         self.track_entry(entry)
-
-        to_dir.fs_childs[entry.name] = entry
-
-        if source.parent_id:
-            parent = self.get_entry_by_id(source.parent_id)
-
-            if parent is not None and len(parent.fs_childs) > 0:
-                del parent.fs_childs[source.name]
 
         self.remove_entry(source)
 
@@ -431,15 +377,13 @@ class OverlayFS(BaseFS): # type: ignore
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
         except Exception as exc:
-            logger.critical("Unexpected exception: %s", repr(exc))
+            logger.critical("Unexpected exception in create_file(): %s", repr(exc))
             raise FSException(NFSError.ERR_IO) from exc
         finally:
             close_no_exc(fd)
 
         entry = self.create_fsentry(path, dest)
         self.track_entry(entry)
-
-        dest.fs_childs[entry.name] = entry
 
         return entry
 
@@ -449,23 +393,16 @@ class OverlayFS(BaseFS): # type: ignore
         self._verify_owned(entry)
         self._verify_writable()
 
-        for child in self.iter_descendants(entry, inclusive=True):
-            try:
-                os.remove(child.fs_source)
+        try:
+            os.remove(entry.fs_source)
 
-            except OSError as exc:
-                raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
-            except Exception as exc:
-                logger.critical("Unexpected exception: %s", repr(exc))
-                raise FSException(NFSError.ERR_IO) from exc
+        except OSError as exc:
+            raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
+        except Exception as exc:
+            logger.critical("Unexpected exception in rm(): %s", repr(exc))
+            raise FSException(NFSError.ERR_IO) from exc
 
-            if child.parent_id:
-                parent = self.get_entry_by_id(child.parent_id)
-
-                if parent is not None and len(parent.fs_childs) > 0:
-                    del parent.fs_childs[child.name]
-
-            self.remove_entry(child)
+        self.remove_entry(entry)
 
     def read(self, entry: FSEntry, offset: int, count: int) -> bytes:
         logger.debug("CALL: read: entry=%s", entry.fs_source)
@@ -485,7 +422,7 @@ class OverlayFS(BaseFS): # type: ignore
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
         except Exception as exc:
-            logger.critical("Unexpected exception: %s", repr(exc))
+            logger.critical("Unexpected exception in read(): %s", repr(exc))
             raise FSException(NFSError.ERR_IO) from exc
         finally:
             close_no_exc(fd)
@@ -511,7 +448,7 @@ class OverlayFS(BaseFS): # type: ignore
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
         except Exception as exc:
-            logger.critical("Unexpected exception: %s", repr(exc))
+            logger.critical("Unexpected exception in write(): %s", repr(exc))
             raise FSException(NFSError.ERR_IO) from exc
         finally:
             close_no_exc(fd)
@@ -532,7 +469,7 @@ class OverlayFS(BaseFS): # type: ignore
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
         except Exception as exc:
-            logger.critical("Unexpected exception: %s", repr(exc))
+            logger.critical("Unexpected exception in readlink(): %s", repr(exc))
             raise FSException(NFSError.ERR_IO) from exc
 
         return res
@@ -559,7 +496,7 @@ class OverlayFS(BaseFS): # type: ignore
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
         except Exception as exc:
-            logger.critical("Unexpected exception: %s", repr(exc))
+            logger.critical("Unexpected exception in symlink(): %s", repr(exc))
             raise FSException(NFSError.ERR_IO) from exc
         finally:
             close_no_exc(fd1)
@@ -567,8 +504,6 @@ class OverlayFS(BaseFS): # type: ignore
 
         entry = self.create_fsentry(path, dest)
         self.track_entry(entry)
-
-        dest.fs_childs[entry.name] = entry
 
         return entry
 
@@ -588,7 +523,7 @@ class OverlayFS(BaseFS): # type: ignore
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
         except Exception as exc:
-            logger.critical("Unexpected exception: %s", repr(exc))
+            logger.critical("Unexpected exception in setattrs(): %s", repr(exc))
             raise FSException(NFSError.ERR_IO) from exc
         finally:
             close_no_exc(fd)
