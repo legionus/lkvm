@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2024  Alexey Gladkov <legion@kernel.org>
 
-from typing import Dict, Any
+from typing import Dict, List, Any
 
 
 class KernelCmdline:
@@ -32,6 +32,9 @@ class KernelCmdline:
                 continue
             n += 1
         return n
+
+    def keys(self) -> List[str]:
+        return list(self._dict.keys())
 
     def join(self) -> str:
         ret = [ self._mode ]
