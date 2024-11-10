@@ -73,6 +73,10 @@ def expandvars(config: Dict[str,Any]) -> Dict[str,Any] | lkvm.Error:
     return ret
 
 
+def expandvars_string(config: Dict[str,Any], value: str) -> str:
+    return subst_str(Mapping(config), [], value)
+
+
 def add_value(config: Dict[str, Any], name: str, value: Any) -> None:
     conf_type = "store"
 
