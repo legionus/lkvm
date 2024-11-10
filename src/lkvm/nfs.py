@@ -122,9 +122,14 @@ def set_fd_attrs(fd: int, attrs: Dict[str, Any]) -> None:
         os.fchmod(fd, attrs["mode"])
 
     if "atime" in attrs or "mtime" in attrs:
-        now = int(time.time())
-        atime = attrs.get("atime") or now
-        mtime = attrs.get("mtime") or now
+        atime = mtime = int(time.time())
+
+        if "atime" in attrs and attrs["atime"] is not None:
+            atime = int(attrs["atime"].timestamp())
+
+        if "mtime" in attrs and attrs["mtime"] is not None:
+            mtime = int(attrs["mtime"].timestamp())
+
         os.utime(fd, times=(atime, mtime))
 
 
