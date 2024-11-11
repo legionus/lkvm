@@ -53,7 +53,7 @@ class FSEntry(BaseFSEntry): # type: ignore
     fs_stat: os.stat_result
 
 
-class FSEntryLink:
+class FSEntryLink(FSEntry):
     """Quick way to make fake hardlinks with different names like `.` and `..`"""
 
     def __init__(self, base: FSEntry, replacements: Dict[str, Any]):
@@ -227,13 +227,13 @@ class OverlayFS(BaseFS): # type: ignore
         self.inodes.put(entry.fs_stat.st_dev, entry.fs_stat.st_ino)
         del self.entries[entry.fileid]
 
-    def get_child_by_name(self, directory: FSEntry, name: bytes) -> Optional[Union[FSEntry, FSEntryLink]]:
+    def get_child_by_name(self, directory: FSEntry, name: bytes) -> Optional[FSEntry]:
         return self.lookup(directory, name)
 
     def get_entry_by_id(self, fileid: int) -> Optional[FSEntry]:
         return self.entries.get(fileid)
 
-    def get_dir_childs(self, directory: FSEntry) -> Dict[bytes, Union[FSEntry, FSEntryLink]]:
+    def get_dir_childs(self, directory: FSEntry) -> Dict[bytes, FSEntry]:
         self._verify_owned(directory)
 
         if directory.type != FileType.DIR:
@@ -244,7 +244,7 @@ class OverlayFS(BaseFS): # type: ignore
         if directory.parent_id:
             parent = self.get_entry_by_id(directory.parent_id)
 
-        childs: Dict[bytes, Union[FSEntry, FSEntryLink]] = {
+        childs: Dict[bytes, FSEntry] = {
                 b"." : FSEntryLink(directory, {"name": b"." }),
                 b"..": FSEntryLink(parent,    {"name": b".."}),
         }
@@ -275,13 +275,13 @@ class OverlayFS(BaseFS): # type: ignore
 
         return childs
 
-    def lookup(self, directory: FSEntry, name: bytes) -> Optional[Union[FSEntry, FSEntryLink]]:
+    def lookup(self, directory: FSEntry, name: bytes) -> Optional[FSEntry]:
         logger.debug("CALL: lookup: dir=%s name=%s", directory.fs_source, name)
 
         childs = self.get_dir_childs(directory)
         return childs.get(name)
 
-    def readdir(self, directory: FSEntry) -> Sequence[Union[FSEntry, FSEntryLink]]:
+    def readdir(self, directory: FSEntry) -> Sequence[FSEntry]:
         logger.debug("CALL: readdir: dir=%s", directory.fs_source)
 
         childs = self.get_dir_childs(directory)
