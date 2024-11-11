@@ -17,10 +17,10 @@ import weakref
 from typing import Optional, Sequence, Dict, Tuple, Union, Any
 
 from shenaniganfs.fs          import FileType, BaseFSEntry, BaseFS, NFSError, FSException, DecodedFileHandle # type: ignore[import-untyped]
-from shenaniganfs.fs_manager  import EvictingFileSystemManager, FileSystemManager, create_fs                 # type: ignore[import-untyped]
+from shenaniganfs.fs_manager  import FileSystemManager                                                       # type: ignore[import-untyped]
 from shenaniganfs.nfs2        import MountV1Service, NFSV2Service                                            # type: ignore[import-untyped]
 from shenaniganfs.nfs3        import MountV3Service, NFSV3Service                                            # type: ignore[import-untyped]
-from shenaniganfs.server      import TCPTransportServer                                                      # type: ignore[import-untyped]
+from shenaniganfs.server      import TCPTransportServer, CallContext                                         # type: ignore[import-untyped]
 from shenaniganfs.statd       import StatDV1Server                                                           # type: ignore[import-untyped]
 
 import lkvm
@@ -584,10 +584,23 @@ class OverlayFileHandleEncoder(abc.ABC):
         return DecodedFileHandle(*struct.unpack("!QQ", payload))
 
 
-async def serve_nfs(fs_manager: FileSystemManager,
-                    srvaddr: Tuple[str,int] = ("localhost", 2049)) -> None:
+async def main(rootfs: bytes,
+               mountpoints: Dict[bytes, bytes],
+               nfsport: int) -> None:
 
-    transport_server = TCPTransportServer(srvaddr[0], srvaddr[1])
+    def create_overlayfs(call_ctx: CallContext) -> OverlayFS:
+        new_fs = OverlayFS(rootfs=rootfs, mountpoints=mountpoints)
+        new_fs.owner_addr = call_ctx.transport.client_addr[0]
+        return new_fs
+
+    fs_manager = FileSystemManager(
+        handle_encoder = OverlayFileHandleEncoder(os.urandom(32)),
+        factories = {
+            b"/": create_overlayfs,
+        },
+    )
+
+    transport_server = TCPTransportServer("localhost", nfsport)
     transport_server.register_prog(MountV1Service(fs_manager))
     transport_server.register_prog(NFSV2Service(fs_manager))
     transport_server.register_prog(MountV3Service(fs_manager))
@@ -599,20 +612,6 @@ async def serve_nfs(fs_manager: FileSystemManager,
 
     async with server:
         await server.serve_forever()
-
-
-async def main(rootfs: bytes,
-               mountpoints: Dict[bytes, bytes],
-               nfsport: int) -> None:
-    fs_manager = EvictingFileSystemManager(
-        OverlayFileHandleEncoder(os.urandom(32)),
-        factories = {
-            b"/": lambda ctx: create_fs(OverlayFS, ctx,
-                                        rootfs=rootfs,
-                                        mountpoints=mountpoints),
-        },
-    )
-    await serve_nfs(fs_manager, srvaddr=("localhost", nfsport))
 
 
 def thread(rootfs: bytes,
