@@ -261,9 +261,10 @@ class OverlayFS(BaseFS): # type: ignore
                     childs[fname] = cur
                     continue
 
-                childs[fname] = self.create_fsentry(os.path.join(directory.fs_source, fname),
-                                                    directory, fstat=st)
-                self.track_entry(childs[fname])
+                new = self.create_fsentry(os.path.join(directory.fs_source, fname),
+                                          directory, fstat=st)
+                childs[fname] = new
+                self.track_entry(new)
 
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
@@ -301,9 +302,10 @@ class OverlayFS(BaseFS): # type: ignore
             os.mkdir(name, mode=0o700, dir_fd=fd1)
 
             fd2 = -1
-            fd2 = os.open(path, os.O_DIRECTORY|os.O_NOFOLLOW|os.O_NOCTTY, dir_fd=fd1)
+            fd2 = os.open(name, os.O_DIRECTORY|os.O_NOFOLLOW|os.O_NOCTTY, dir_fd=fd1)
 
             set_fd_attrs(fd2, attrs)
+            st = os.fstat(fd2)
 
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
@@ -314,7 +316,7 @@ class OverlayFS(BaseFS): # type: ignore
             close_no_exc(fd1)
             close_no_exc(fd2)
 
-        entry = self.create_fsentry(path, dest)
+        entry = self.create_fsentry(path, dest, fstat=st)
         self.track_entry(entry)
 
         return entry
@@ -359,6 +361,7 @@ class OverlayFS(BaseFS): # type: ignore
             fd1 = os.open(to_dir.fs_source, os.O_DIRECTORY|os.O_NOFOLLOW|os.O_NOCTTY)
 
             os.rename(source.fs_source, new_name, dst_dir_fd=fd1)
+            st = os.lstat(new_name, dir_fd=fd1)
 
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
@@ -368,7 +371,7 @@ class OverlayFS(BaseFS): # type: ignore
         finally:
             close_no_exc(fd1)
 
-        entry = self.create_fsentry(path, to_dir)
+        entry = self.create_fsentry(path, to_dir, fstat=st)
         self.track_entry(entry)
 
         self.remove_entry(source)
@@ -385,6 +388,7 @@ class OverlayFS(BaseFS): # type: ignore
             fd = -1
             fd = os.open(path, os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW|os.O_NOCTTY)
             set_fd_attrs(fd, attrs)
+            st = os.fstat(fd)
 
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
@@ -394,7 +398,7 @@ class OverlayFS(BaseFS): # type: ignore
         finally:
             close_no_exc(fd)
 
-        entry = self.create_fsentry(path, dest)
+        entry = self.create_fsentry(path, dest, fstat=st)
         self.track_entry(entry)
 
         return entry
@@ -504,6 +508,7 @@ class OverlayFS(BaseFS): # type: ignore
             fd2 = os.open(name, os.O_NOFOLLOW|os.O_NOCTTY, dir_fd=fd1)
 
             set_fd_attrs(fd2, attrs)
+            st = os.fstat(fd2)
 
         except OSError as exc:
             raise FSException(nfserror_from_errno(exc.errno), exc.strerror) from exc
@@ -514,7 +519,7 @@ class OverlayFS(BaseFS): # type: ignore
             close_no_exc(fd1)
             close_no_exc(fd2)
 
-        entry = self.create_fsentry(path, dest)
+        entry = self.create_fsentry(path, dest, fstat=st)
         self.track_entry(entry)
 
         return entry
