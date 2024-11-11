@@ -155,10 +155,10 @@ class OverlayFS(BaseFS): # type: ignore
         self.inodes = FSinodes()
 
         self.root_dir = None
-        self.root_dir = self.create_fsentry(rootfs)
+        self.root_dir = self.create_fsentry(rootfs, b"")
         self.track_entry(self.root_dir)
 
-    def create_fsentry(self, path: bytes,
+    def create_fsentry(self, base: bytes, name: bytes,
                        parent: Optional[FSEntry] = None,
                        fstat: Optional[os.stat_result] = None) -> FSEntry:
         types = {
@@ -171,32 +171,25 @@ class OverlayFS(BaseFS): # type: ignore
             stat.S_IFSOCK: FileType.SOCK,
         }
 
-        path = os.path.abspath(path)
-        parent_id = None
-        overlay_path = None
-        fs_path = path
+        path = os.path.abspath(os.path.join(base, name))
 
-        if self.root_dir:
-            overlay_path = self.mountpoints.get(path[len(self.root_dir.fs_source):])
-            if overlay_path:
-                fs_path = overlay_path
-
-        if parent:
-            parent_id = parent.fileid
+        if self.root_dir and path.startswith(self.root_dir.fs_source):
+            if redirect := self.mountpoints.get(path[len(self.root_dir.fs_source):]):
+                path = redirect
 
         if fstat is None:
-            fstat = os.lstat(fs_path)
+            fstat = os.lstat(path)
 
         entry = fill_fsentry(FSEntry(), fstat)
 
         kwargs: Dict[str, Any] = {
-                "fs_source" : fs_path,
+                "fs_source" : path,
                 "fs_links"  : 0,
                 "fs"        : weakref.ref(self),
                 "type"      : types.get(stat.S_IFMT(entry.fs_stat.st_mode),
                                         FileType.REG),
-                "name"      : os.path.basename(path),
-                "parent_id" : parent_id,
+                "name"      : name,
+                "parent_id" : parent.fileid if parent else None,
                 "fileid"    : self.inodes.get(entry.fs_stat.st_dev,
                                               entry.fs_stat.st_ino),
                 "nlink"     : 2,
@@ -226,6 +219,10 @@ class OverlayFS(BaseFS): # type: ignore
 
         self.inodes.put(entry.fs_stat.st_dev, entry.fs_stat.st_ino)
         del self.entries[entry.fileid]
+
+    def _verify_name(self, name: bytes) -> None:
+        if not self._is_valid_name(name):
+            raise FSException(NFSError.ERR_NOENT)
 
     def get_child_by_name(self, directory: FSEntry, name: bytes) -> Optional[FSEntry]:
         return self.lookup(directory, name)
@@ -261,8 +258,8 @@ class OverlayFS(BaseFS): # type: ignore
                     childs[fname] = cur
                     continue
 
-                new = self.create_fsentry(os.path.join(directory.fs_source, fname),
-                                          directory, fstat=st)
+                new = self.create_fsentry(directory.fs_source, fname,
+                                          parent=directory, fstat=st)
                 childs[fname] = new
                 self.track_entry(new)
 
@@ -278,6 +275,8 @@ class OverlayFS(BaseFS): # type: ignore
     def lookup(self, directory: FSEntry, name: bytes) -> Optional[FSEntry]:
         logger.debug("CALL: lookup: dir=%s name=%s", directory.fs_source, name)
 
+        self._verify_name(name)
+
         childs = self.get_dir_childs(directory)
         return childs.get(name)
 
@@ -291,9 +290,8 @@ class OverlayFS(BaseFS): # type: ignore
         logger.debug("CALL: mkdir: dir=%s name=%s", dest.fs_source, name)
 
         self._verify_owned(dest)
+        self._verify_name(name)
         self._verify_writable()
-
-        path = os.path.join(dest.fs_source, name)
 
         try:
             fd1 = -1
@@ -316,7 +314,7 @@ class OverlayFS(BaseFS): # type: ignore
             close_no_exc(fd1)
             close_no_exc(fd2)
 
-        entry = self.create_fsentry(path, dest, fstat=st)
+        entry = self.create_fsentry(dest.fs_source, name, parent=dest, fstat=st)
         self.track_entry(entry)
 
         return entry
@@ -349,12 +347,11 @@ class OverlayFS(BaseFS): # type: ignore
 
         self._verify_owned(source)
         self._verify_owned(to_dir)
+        self._verify_name(new_name)
         self._verify_writable()
 
         if to_dir.type != FileType.DIR:
             raise FSException(NFSError.ERR_NOTDIR, "Not a directory")
-
-        path = os.path.join(to_dir.fs_source, new_name)
 
         try:
             fd1 = -1
@@ -371,7 +368,7 @@ class OverlayFS(BaseFS): # type: ignore
         finally:
             close_no_exc(fd1)
 
-        entry = self.create_fsentry(path, to_dir, fstat=st)
+        entry = self.create_fsentry(to_dir.fs_source, new_name, parent=to_dir, fstat=st)
         self.track_entry(entry)
 
         self.remove_entry(source)
@@ -380,6 +377,7 @@ class OverlayFS(BaseFS): # type: ignore
         logger.debug("CALL: create_file: dst=%s name=%s", dest.fs_source, name)
 
         self._verify_owned(dest)
+        self._verify_name(name)
         self._verify_writable()
 
         path = os.path.join(dest.fs_source, name)
@@ -398,7 +396,7 @@ class OverlayFS(BaseFS): # type: ignore
         finally:
             close_no_exc(fd)
 
-        entry = self.create_fsentry(path, dest, fstat=st)
+        entry = self.create_fsentry(dest.fs_source, name, parent=dest, fstat=st)
         self.track_entry(entry)
 
         return entry
@@ -494,9 +492,8 @@ class OverlayFS(BaseFS): # type: ignore
         logger.debug("CALL: symlink: dst=%s name=%s", dest.fs_source, name)
 
         self._verify_owned(dest)
+        self._verify_name(name)
         self._verify_writable()
-
-        path = os.path.join(dest.fs_source, name)
 
         try:
             fd1 = -1
@@ -519,7 +516,7 @@ class OverlayFS(BaseFS): # type: ignore
             close_no_exc(fd1)
             close_no_exc(fd2)
 
-        entry = self.create_fsentry(path, dest, fstat=st)
+        entry = self.create_fsentry(dest.fs_source, name, parent=dest, fstat=st)
         self.track_entry(entry)
 
         return entry
