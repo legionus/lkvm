@@ -65,7 +65,7 @@ def main(cmdargs: argparse.Namespace) -> int:
         lkvm.qemu.dump([qemu_exe] + qemu_args)
         return lkvm.EX_SUCCESS
 
-    if lkvm.HAVE_NFS:
+    if lkvm.HAVE_NFS and config["vm"]["mode"] == "nfs":
         t = threading.Thread(
                 target=lkvm.nfs.thread,
                 kwargs={
