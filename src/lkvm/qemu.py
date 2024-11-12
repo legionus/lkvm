@@ -251,7 +251,8 @@ def arg_cmdline(key: str, config: Dict[str, Any]) -> List[str]:
     if config["mode"] == "nfs":
         required_params["init"]        = "/virt/init"
         required_params["root"]        = "/dev/nfs"
-        required_params["nfsroot"]     = "/,port=${nfsport}"
+        required_params["nfsroot"]     = "/,tcp,port=${nfsport},mountport=${nfsport}"
+        required_params["nfsrootdebug"]= True
         required_params["earlyprintk"] = "serial"
         required_params["ip"]          = "dhcp"
         optional_params["rw"]          = True

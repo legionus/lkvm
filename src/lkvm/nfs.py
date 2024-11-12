@@ -603,7 +603,6 @@ async def main(rootfs: bytes,
     transport_server.register_prog(MountV3Service(fs_manager))
     transport_server.register_prog(NFSV3Service(fs_manager))
     transport_server.register_prog(StatDV1Server())
-    await transport_server.notify_rpcbind()
 
     server = await transport_server.start()
 
