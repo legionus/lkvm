@@ -35,7 +35,7 @@ def write_file(filename: str, data: List[str]) -> None:
             print(line, file=fd)
 
 
-def setup_rootfs(rootfs: str, confdata: List[str]) -> None:
+def setup_rootfs(mode: str, rootfs: str, confdata: List[str]) -> None:
     for path in ["dev", "etc", "host", "proc", "sys", "tmp", "var/lib", "virt/home"]:
         os.makedirs(os.path.join(rootfs, path), mode=0o755, exist_ok=True)
 
@@ -44,16 +44,17 @@ def setup_rootfs(rootfs: str, confdata: List[str]) -> None:
 
     make_symlink("../proc/self/mounts", os.path.join(rootfs, "etc/mtab"))
 
-    copy_resource("init",    os.path.join(rootfs, "init"),      mode=0o755)
-    copy_resource("init.sh", os.path.join(rootfs, "virt/init"), mode=0o755)
-
     write_file(os.path.join(rootfs, "etc/passwd"), ["root:x:0:0:root:/virt/home:/bin/bash"])
     write_file(os.path.join(rootfs, "etc/group"),  ["root:x:0:"])
 
-    confdata.extend([
-        "\tvirtfs = ${rootfs}:/dev/root",
-        "\tvirtfs = /:hostfs",
-    ])
+    copy_resource("init.sh", os.path.join(rootfs, "virt/init"), mode=0o755)
+
+    if mode in ["9p"]:
+        copy_resource("init", os.path.join(rootfs, "init"), mode=0o755)
+        confdata.extend([
+            "\tvirtfs = ${rootfs}:/dev/root",
+            "\tvirtfs = /:hostfs",
+        ])
 
 
 def main(cmdargs: argparse.Namespace) -> int:
@@ -86,13 +87,14 @@ def main(cmdargs: argparse.Namespace) -> int:
         if not lkvm.HAVE_NFS:
             logger.critical("nfs mode is not available because the required python modules are missing.")
             return lkvm.EX_FAILURE
-        setup_rootfs(config["global"]["rootfs"], data)
+        setup_rootfs(cmdargs.mode, config["global"]["rootfs"], data)
         data.append("\tdevice = e1000,netdev=nfs0")
         data.append("\tnetwork = netdev,user,id=nfs0")
+        data.append("\t# nfsport = 2049")
         data.append("\t# kernel = /path/to/linux/bzImage")
 
     if cmdargs.mode == "9p":
-        setup_rootfs(config["global"]["rootfs"], data)
+        setup_rootfs(cmdargs.mode, config["global"]["rootfs"], data)
         data.append("\t# kernel = /path/to/linux/bzImage")
 
     if cmdargs.mode == "disk":
@@ -103,6 +105,8 @@ def main(cmdargs: argparse.Namespace) -> int:
 
     if cmdargs.mode in ["9p", "nfs"]:
         logger.warning("for %s mode it is necessary to specify a kernel to run.", cmdargs.mode)
+        if cmdargs.mode in ["nfs"]:
+            logger.warning("it's also necessary to specify a nfsport in order to run more than one vm at the same time.")
     else:
         logger.warning("for %s mode it is necessary to specify a disks to run.", cmdargs.mode)
 
