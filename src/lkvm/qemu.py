@@ -12,6 +12,7 @@ import lkvm.config
 import lkvm.kernel
 
 logger = lkvm.logger
+serial = 0
 
 
 def executable(arch: str) -> str | lkvm.Error:
@@ -146,6 +147,8 @@ def arg_monitor(key: str, config: Dict[str, Any]) -> List[str]:
     return []
 
 def arg_console(key: str, config: Dict[str, Any]) -> List[str]:
+    global serial
+
     value = config[key]
 
     if not value or value == "none":
@@ -157,7 +160,8 @@ def arg_console(key: str, config: Dict[str, Any]) -> List[str]:
         (columns, lines) = os.get_terminal_size()
 
         lkvm.kernel.CMDLINE["winsize"] = f"{lines}x{columns}"
-        lkvm.kernel.CMDLINE["console"] = "ttyS0"
+        lkvm.kernel.CMDLINE["console"] = f"ttyS{serial}"
+        serial += 1
 
         ret.extend(["-serial", "chardev:stdio"])
 
