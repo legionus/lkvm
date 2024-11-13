@@ -26,6 +26,15 @@ def cmd_run(cmdargs: argparse.Namespace) -> int:
     return lkvm.command_run.main(cmdargs)
 
 
+def cmd_sandbox(cmdargs: argparse.Namespace) -> int:
+    import lkvm.command_run
+
+    lkvm.command_run.sandbox_prog = cmdargs.prog
+    lkvm.command_run.sandbox_args = cmdargs.args
+
+    return lkvm.command_run.main(cmdargs)
+
+
 def add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-v", "--verbose",
                         dest="verbose", action='count', default=0,
@@ -115,6 +124,26 @@ Starts a virtual machine according to specified profile.
                      help='show what should be launched.')
     add_qemu_arguments(sp2)
     sp2.add_argument("profile", help="name of profile")
+
+    # command: sandbox
+    sp3_description = """\
+Runs a command in a sandboxed guest. vm will inject a special init binary which
+will do an initial setup of the guest Linux and then lauch a shell script with
+the specified command. Upon this command ending, the guest will be shutdown.
+
+"""
+    sp3 = subparsers.add_parser("sandbox",
+                                description=sp3_description, help=sp3_description,
+                                epilog=epilog, add_help=False)
+    sp3.set_defaults(func=cmd_sandbox)
+    add_common_arguments(sp3)
+    sp3.add_argument('-n', '--dry-run',
+                     dest="dry_run", action='store_true', default=False,
+                     help='show what should be launched.')
+    add_qemu_arguments(sp3)
+    sp3.add_argument("profile", help="name of profile")
+    sp3.add_argument("prog", help="script when booting into custom rootfs")
+    sp3.add_argument("args", nargs='*', help="optional <prog> arguments")
 
     return parser
 

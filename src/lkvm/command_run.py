@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2024  Alexey Gladkov <legion@kernel.org>
 
+import os
+import os.path
 import argparse
 import threading
 
-from typing import Dict, List, Any
+from typing import Optional, Dict, List, Any
 
 import lkvm
 import lkvm.config
@@ -16,6 +18,8 @@ if lkvm.HAVE_NFS:
 
 logger = lkvm.logger
 
+sandbox_prog: Optional[str] = None
+sandbox_args: List[str] = []
 
 def arguments(config: Dict[str, Any]) -> List[str] | lkvm.Error:
     retlist: List[str] = []
@@ -76,6 +80,20 @@ def main(cmdargs: argparse.Namespace) -> int:
         t.daemon = True
         t.start()
 
+    if sandbox_prog is not None:
+        cwd = os.getcwd()
+        wrapper = os.path.join(config["global"]["rootfs"], "virt/sandbox.sh")
+
+        with open(wrapper, mode="w", encoding="utf-8") as fh:
+            print('#!/bin/sh\n',
+                  f'cd "/host/{cwd}"\n',
+                  f'exec "{sandbox_prog}"', " ".join(map(lambda x: f'"{x}"', sandbox_args)),
+                  file=fh)
+            os.chmod(wrapper, 0o755)
+
     lkvm.exec_command([qemu_exe] + qemu_args)
+
+    if sandbox_prog is not None:
+        os.remove(wrapper)
 
     return lkvm.EX_SUCCESS
