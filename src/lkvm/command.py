@@ -81,6 +81,7 @@ of your home directory.
 
 """
     sp0 = subparsers.add_parser("setup",
+                                formatter_class=argparse.RawTextHelpFormatter,
                                 description=sp0_description, help=sp0_description,
                                 epilog=epilog, add_help=False)
     sp0.set_defaults(func=cmd_setup)
@@ -104,6 +105,7 @@ directory.
 
 """
     sp1 = subparsers.add_parser("list",
+                                formatter_class=argparse.RawTextHelpFormatter,
                                 description=sp1_description, help=sp1_description,
                                 epilog=epilog, add_help=False)
     sp1.set_defaults(func=cmd_list)
@@ -115,6 +117,7 @@ Starts a virtual machine according to specified profile.
 
 """
     sp2 = subparsers.add_parser("run",
+                                formatter_class=argparse.RawTextHelpFormatter,
                                 description=sp2_description, help=sp2_description,
                                 epilog=epilog, add_help=False)
     sp2.set_defaults(func=cmd_run)
@@ -133,6 +136,7 @@ the specified command. Upon this command ending, the guest will be shutdown.
 
 """
     sp3 = subparsers.add_parser("sandbox",
+                                formatter_class=argparse.RawTextHelpFormatter,
                                 description=sp3_description, help=sp3_description,
                                 epilog=epilog, add_help=False)
     sp3.set_defaults(func=cmd_sandbox)
