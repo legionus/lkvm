@@ -91,7 +91,10 @@ def main(cmdargs: argparse.Namespace) -> int:
                   file=fh)
             os.chmod(wrapper, 0o755)
 
-    lkvm.exec_command([qemu_exe] + qemu_args)
+    lkvm.exec_command([
+            qemu_exe,
+            "-pidfile", os.path.join(config["global"]["profile"], "pid"),
+        ] + qemu_args)
 
     if sandbox_prog is not None:
         os.remove(wrapper)
