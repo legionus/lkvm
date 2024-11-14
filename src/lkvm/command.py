@@ -35,6 +35,11 @@ def cmd_sandbox(cmdargs: argparse.Namespace) -> int:
     return lkvm.command_run.main(cmdargs)
 
 
+def cmd_vm(cmdargs: argparse.Namespace) -> int:
+    import lkvm.command_vm
+    return lkvm.command_vm.main(cmdargs)
+
+
 def add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-v", "--verbose",
                         dest="verbose", action='count', default=0,
@@ -148,6 +153,31 @@ the specified command. Upon this command ending, the guest will be shutdown.
     sp3.add_argument("profile", help="name of profile")
     sp3.add_argument("prog", help="script when booting into custom rootfs")
     sp3.add_argument("args", nargs='*', help="optional <prog> arguments")
+
+    # command: crash
+    sp4_description = """\
+Controls the VM state (start, stop, pause, etc.).
+
+"""
+    sp4 = subparsers.add_parser("vm",
+                                formatter_class=argparse.RawTextHelpFormatter,
+                                description=sp4_description, help=sp4_description,
+                                epilog=epilog, add_help=False)
+    sp4.set_defaults(func=cmd_vm)
+    add_common_arguments(sp4)
+    sp4.add_argument('--stop',
+                     dest="vm_state", action='store_const', const="stop",
+                     help='Stop guest VM execution.')
+    sp4.add_argument('--continue',
+                     dest="vm_state", action='store_const', const="continue",
+                     help='Resume guest VM execution.')
+    sp4.add_argument('--quit',
+                     dest="vm_state", action='store_const', const="quit",
+                     help='QEMU process to exit gracefully.')
+    sp4.add_argument('--dump-memory',
+                     dest="dump_memory", action='store', metavar='FILE',
+                     help='Dump guest VM memory to FILE.')
+    sp4.add_argument("profile", help="name of profile")
 
     return parser
 
