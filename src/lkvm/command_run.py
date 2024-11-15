@@ -28,8 +28,9 @@ def arguments(config: Dict[str, Any]) -> List[str] | lkvm.Error:
         if not param.confname or not param.qemu_arg:
             continue
 
-        if args := param.qemu_arg(param.confname, config):
-            retlist.extend(args)
+        if args := param.qemu_arg(param.confname, config["vm"]):
+            for v in args:
+                retlist.append(lkvm.config.expandvars_string(config, v))
 
     return retlist
 
@@ -46,19 +47,13 @@ def main(cmdargs: argparse.Namespace) -> int:
     for p in lkvm.parameters.PARAMS:
         p.add_config(cmdargs, config["vm"])
 
-    config = lkvm.config.expandvars(config)
-
-    if isinstance(config, lkvm.Error):
-        logger.critical("%s", config.message)
-        return lkvm.EX_FAILURE
-
     qemu_exe = lkvm.qemu.executable(config["vm"]["arch"])
 
     if isinstance(qemu_exe, lkvm.Error):
         logger.critical("%s", qemu_exe.message)
         return lkvm.EX_FAILURE
 
-    qemu_args = arguments(config["vm"])
+    qemu_args = arguments(config)
 
     if isinstance(qemu_args, lkvm.Error):
         logger.critical("%s", qemu_args.message)
