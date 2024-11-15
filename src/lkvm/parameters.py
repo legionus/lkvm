@@ -276,6 +276,14 @@ PARAMS = [
               default  = '',
               qemu_arg = lkvm.qemu.arg_cmdline,
               desc     = 'Specifies cmdline as kernel command line'),
+
+    Parameter(name     = 'qemu',
+              cmdline  = None,
+              confname = 'qemu',
+              action   = 'append',
+              default  = [],
+              qemu_arg = lkvm.qemu.arg_unknown,
+              desc     = 'Extra qemu arguments'),
 ]
 
 CONFNAMES = [ p.confname for p in PARAMS ]

@@ -287,6 +287,17 @@ def arg_cmdline(key: str, config: Dict[str, Any]) -> List[str]:
 
     return []
 
+def arg_unknown(key: str, config: Dict[str, Any]) -> List[str]:
+    ret: List[str] = []
+    value = config[key]
+
+    if isinstance(value, list):
+        for v in value:
+            ret.extend(v.split())
+
+    return ret
+
+
 def dump(a: List[str]) -> None:
     is_option = False
     prev_is_option = False
