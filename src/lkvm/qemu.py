@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2024  Alexey Gladkov <legion@kernel.org>
 
-import glob
 import os
 import re
 
@@ -220,18 +219,17 @@ def arg_kernel(key: str, config: Dict[str, Any]) -> List[str]:
     if not value:
         return []
 
-    if value.startswith("find,"):
-        path = value[len("find,"):]
+    if value == "find" or value.startswith("find,"):
+        if value.startswith("find,"):
+            path = value[len("find,"):]
+        else:
+            path = os.getcwd()
 
-        res = []
-
-        for img in glob.glob(f'{path}/arch/*/boot/*Image'):
-            statinfo = os.stat(img)
-            res.append((statinfo.st_mtime, img))
-
-        if len(res) > 0:
-            sorted(res, key=lambda x: x[0], reverse=True)
-            value = res[0][1]
+        if img := lkvm.kernel.find_image(path, os.environ):
+            value = img
+        else:
+            logger.critical("Unable to find kernel image in path `%s'", path)
+            return []
 
     return ["-kernel", str(value)]
 
