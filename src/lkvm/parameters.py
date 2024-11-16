@@ -253,6 +253,14 @@ PARAMS = [
               qemu_arg = lkvm.qemu.arg_boot,
               desc     = 'Specifies boot order drives as a string of drive letters'),
 
+    Parameter(name     = 'debugger',
+              cmdline  = 'debugger',
+              confname = 'debugger',
+              action   = 'store',
+              default  = '',
+              qemu_arg = lkvm.qemu.arg_debugger,
+              desc     = 'Allows to debug guest code'),
+
     Parameter(name     = 'kernel',
               cmdline  = 'kernel',
               confname = 'kernel',

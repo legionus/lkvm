@@ -3,6 +3,7 @@
 
 import os
 import re
+import sys
 
 from typing import Dict, List, Any
 
@@ -210,6 +211,56 @@ def arg_network(key: str, config: Dict[str, Any]) -> List[str]:
         else:
             logger.critical("BUG: Unknown network type: %s", v)
             return []
+
+    return ret
+
+def arg_debugger(key: str, config: Dict[str, Any]) -> List[str]:
+    global serial
+
+    ret: List[str] = []
+
+    value = config[key]
+
+    if not value:
+        return ret
+
+    socket = '${profile}/gdb-socket'
+
+    if m := re.match(r".*,socket=(?P<socket>[^,]+)", value):
+        socket = m.group("socket")
+
+    if value == "none":
+        return ret
+
+    elif value.startswith("kgdb"):
+        ret.extend([
+            "-chardev", f"socket,id=kgdb0,path={socket},server=on,wait=off",
+            "-device", "pci-serial,id=serial0,chardev=kgdb0"
+        ])
+
+        lkvm.kernel.CMDLINE["kgdboc"] = f"ttyS{serial}"
+        lkvm.kernel.CMDLINE["kgdbwait"] = True
+        serial += 1
+
+    elif value.startswith("gdb"):
+        ret.extend([
+            "-chardev", f"socket,id=gdb0,path={socket},server=on,wait=off",
+            "-gdb", "chardev:gdb0", "-S",
+        ])
+
+    else:
+        logger.critical("Unknown debugger type: %s (gdb or kgdb expected)", value)
+        sys.exit(lkvm.EX_FAILURE)
+
+    #
+    # From Documentation/dev-tools/kgdb.rst
+    #
+    # If the architecture that you are using enable KASLR by default, you should
+    # consider turning it off. KASLR randomizes the virtual address where the
+    # kernel image is mapped and confuse gdb which resolve kernel symbol address
+    # from symbol table of vmlinux.
+    #
+    lkvm.kernel.CMDLINE["nokaslr"] = True
 
     return ret
 
