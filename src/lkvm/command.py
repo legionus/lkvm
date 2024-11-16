@@ -118,7 +118,8 @@ directory.
 
     # command: run
     sp_description = """\
-            Starts a virtual machine according to specified profile.
+Starts a virtual machine according to specified profile. Once booted, init will
+mount /proc, /sys and invoke bash.
 
 """
     sp = subparsers.add_parser("run",
