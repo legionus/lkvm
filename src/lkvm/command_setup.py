@@ -69,7 +69,17 @@ def main(cmdargs: argparse.Namespace) -> int:
     for p in lkvm.parameters.PARAMS:
         p.add_config(cmdargs, config["vm"])
 
+    config["vm"]["arch"] = cmdargs.arch
     config["vm"]["mode"] = cmdargs.mode
+
+    if config["vm"]["enable-kvm"] and config["vm"]["arch"] in ["i386", "x86_64"]:
+        config["vm"]["cpu"]        = "host"
+        config["vm"]["machine"]    = "accel=kvm:tcg"
+        config["vm"]["enable-kvm"] = True
+    else:
+        config["vm"]["cpu"]        = "max"
+        config["vm"]["machine"]    = "accel=tcg"
+        config["vm"]["enable-kvm"] = False
 
     data = [
         "[vm]",

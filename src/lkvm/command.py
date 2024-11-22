@@ -2,6 +2,7 @@
 # Copyright (C) 2024  Alexey Gladkov <legion@kernel.org>
 
 import argparse
+import os
 import sys
 import logging
 
@@ -97,6 +98,9 @@ of your home directory.
     if lkvm.HAVE_NFS:
         mode_choices.append("nfs")
 
+    sp.add_argument("-a", "--arch",
+                     dest="arch", action="store", default=os.uname().machine,
+                     help="target architecture.")
     sp.add_argument("-m", "--mode",
                      dest="mode", action="store", default="9p", choices=mode_choices,
                      help="profile mode (default: %(default)s).")
