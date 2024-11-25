@@ -252,6 +252,11 @@ def arg_debugger(key: str, config: Dict[str, Any]) -> List[str]:
         logger.critical("Unknown debugger type: %s (gdb or kgdb expected)", value)
         sys.exit(lkvm.EX_FAILURE)
 
+    # Enable vmcoreinfo (required by drgn memory dumps)
+    ret.extend([
+        "-device", "vmcoreinfo",
+    ])
+
     #
     # From Documentation/dev-tools/kgdb.rst
     #
