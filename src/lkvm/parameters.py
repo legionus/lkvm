@@ -2,6 +2,7 @@
 # Copyright (C) 2024  Alexey Gladkov <legion@kernel.org>
 
 import os
+import platform
 import argparse
 
 from typing import Dict, Any, Optional
@@ -71,8 +72,22 @@ class Parameter:
             pass
 
 
+def detect_kvm() -> bool:
+    return os.access("/dev/kvm", os.R_OK)
+
+
 def detect_arch() -> str:
     return os.uname().machine
+
+
+def detect_machine() -> str:
+    if platform.system() == "Darwin":
+            return "accel=hvf"
+
+    if detect_kvm():
+        return "accel=kvm:tcg"
+
+    return "accel=tcg"
 
 
 def detect_cpu() -> str:
@@ -96,10 +111,6 @@ def detect_memory() -> str:
     return f"{num}M"
 
 
-def detect_kvm() -> bool:
-    return os.access("/dev/kvm", os.R_OK)
-
-
 PARAMS = [
     Parameter(name     = 'mode',
               cmdline  = None,
@@ -121,7 +132,7 @@ PARAMS = [
               cmdline  = 'machine',
               confname = 'machine',
               action   = 'store',
-              default  = 'accel=kvm:tcg',
+              default  = detect_machine,
               qemu_arg = lkvm.qemu.arg_simple,
               desc     = 'Specifies the emulated machine'),
 
