@@ -77,7 +77,11 @@ set_env
 prog="/virt/sandbox.sh"
 [ -x "$prog" ] || prog="$BASH"
 
-"$prog"
+if [ -e /dev/vsock ] && vsock="$(grep -m1 -o 'lkvm.vsock=[^[:space:]]\+' /proc/cmdline 2>/dev/null)"; then
+	socat VSOCK-LISTEN:"${vsock#lkvm.vsock=}",reuseaddr EXEC:"$prog",pty,stderr
+else
+	"$prog"
+fi
 
 if [ -w /proc/sysrq-trigger ]; then
 	#

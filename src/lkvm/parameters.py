@@ -82,7 +82,7 @@ def detect_arch() -> str:
 
 def detect_machine() -> str:
     if platform.system() == "Darwin":
-            return "accel=hvf"
+        return "accel=hvf"
 
     if detect_kvm():
         return "accel=kvm:tcg"

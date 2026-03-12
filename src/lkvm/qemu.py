@@ -4,6 +4,9 @@
 import os
 import re
 import sys
+import signal
+import time
+import errno
 
 from typing import Dict, List, Any
 
@@ -13,6 +16,10 @@ import lkvm.kernel
 
 logger = lkvm.logger
 serial = 0
+pidfile = ""
+
+vsock_cid = 5
+vsock_port = 1234
 
 
 def executable(arch: str) -> str | lkvm.Error:
@@ -156,6 +163,11 @@ def arg_console(key: str, config: Dict[str, Any]) -> List[str]:
 
     ret: List[str] = []
 
+    stdio = [
+        "-chardev", "stdio,mux=on,id=stdio,signal=off",
+        "-mon",     "chardev=stdio,mode=readline",
+    ]
+
     if value == "serial":
         (columns, lines) = os.get_terminal_size()
 
@@ -164,8 +176,13 @@ def arg_console(key: str, config: Dict[str, Any]) -> List[str]:
         serial += 1
 
         ret.extend(["-serial", "chardev:stdio"])
+        ret.extend(stdio)
 
-    elif value == "virtio":
+    elif value == "vsock":
+        lkvm.kernel.CMDLINE["lkvm.vsock"] = f"{vsock_port}"
+        ret.extend(["-device", f"vhost-vsock-pci,guest-cid={vsock_cid}"])
+
+    elif value in ["virtio", "virtconsole"]:
         lkvm.kernel.CMDLINE["console"] = "hvc0"
 
         config["graphic"] = True
@@ -175,15 +192,11 @@ def arg_console(key: str, config: Dict[str, Any]) -> List[str]:
             "-device", "virtio-serial",
             "-device", "virtconsole,chardev=stdio",
         ])
+        ret.extend(stdio)
 
     else:
         logger.critical("BUG: Unknown console type: %s", value)
         return []
-
-    ret.extend([
-        "-chardev", "stdio,mux=on,id=stdio,signal=off",
-        "-mon",     "chardev=stdio,mode=readline",
-    ])
 
     return ret
 
@@ -372,3 +385,42 @@ def dump(a: List[str]) -> None:
         print(" \\\n", sep='', end='')
 
     print("\t#")
+
+
+def get_pid() -> int:
+    with open(pidfile, "r", encoding="utf-8") as f:
+        return int(f.readline())
+    return 0
+
+
+def pid_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError as e:
+        if e.errno == errno.ESRCH:
+            return False
+        if e.errno == errno.EPERM:
+            return True
+        raise
+    else:
+        return True
+
+
+def kill() -> None:
+    sig = signal.SIGTERM
+    pid = get_pid()
+
+    if pid == 0:
+        return
+
+    for i in (0,1,2,3,4):
+        if not pid_exists(pid):
+            break
+
+        if i > 0:
+            time.sleep(0.3)
+
+        if i == 4:
+            sig = signal.SIGKILL
+
+        os.kill(pid, sig)

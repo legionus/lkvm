@@ -12,6 +12,7 @@ import lkvm
 import lkvm.config
 import lkvm.parameters
 import lkvm.qemu
+import lkvm.vsock
 
 if lkvm.HAVE_NFS:
     import lkvm.nfs
@@ -20,6 +21,7 @@ logger = lkvm.logger
 
 sandbox_prog: Optional[str] = None
 sandbox_args: List[str] = []
+
 
 def arguments(config: Dict[str, Any]) -> List[str] | lkvm.Error:
     retlist: List[str] = []
@@ -75,6 +77,13 @@ def main(cmdargs: argparse.Namespace) -> int:
         t.daemon = True
         t.start()
 
+    if config["vm"]["console"] == "vsock":
+        t = threading.Thread(
+                target=lkvm.vsock.main,
+                kwargs={})
+        t.daemon = True
+        t.start()
+
     if sandbox_prog is not None:
         cwd = os.getcwd()
         wrapper = os.path.join(config["global"]["rootfs"], "virt/sandbox.sh")
@@ -86,9 +95,11 @@ def main(cmdargs: argparse.Namespace) -> int:
                   file=fh)
             os.chmod(wrapper, 0o755)
 
+    lkvm.qemu.pidfile = os.path.join(config["global"]["profile"], "pid")
+
     lkvm.exec_command([
             qemu_exe,
-            "-pidfile", os.path.join(config["global"]["profile"], "pid"),
+            "-pidfile", lkvm.qemu.pidfile,
         ] + qemu_args)
 
     if sandbox_prog is not None:
